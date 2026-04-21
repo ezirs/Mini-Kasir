@@ -1,0 +1,307 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import BarcodeScanner from "./components/BarcodeScanner";
+import { Product, CartItem } from "./types";
+import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+
+const GAS_URL = import.meta.env.VITE_GAS_API_URL;
+
+export default function App() {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Use Ref for instant tracking to prevent race conditions during state updates
+  const lastProcessedRef = useRef<{ barcode: string; time: number } | null>(null);
+
+  const fetchProduct = useCallback(async (barcode: string) => {
+    // ... existing mock logic ...
+    if (!GAS_URL || GAS_URL.includes("YOUR_SCRIPT_ID")) {
+      console.warn("GAS URL not set. Using mock data.");
+      await new Promise(resolve => setTimeout(resolve, 300)); // Simulate network lag
+      return {
+        barcode,
+        name: `Product ${barcode.slice(-4)}`,
+        price: Math.floor(Math.random() * 100000) + 1000,
+        imageUrl: `https://picsum.photos/seed/${barcode}/200/200`
+      };
+    }
+
+    try {
+      const response = await fetch(`${GAS_URL}?action=getProduct&barcode=${barcode}`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data as Product;
+    } catch (err) {
+      console.error("Fetch product error:", err);
+      throw err;
+    }
+  }, []);
+
+  const handleScan = async (barcode: string) => {
+    const now = Date.now();
+    
+    // 1. Check if same barcode was processed very recently (within 2.5 seconds)
+    if (lastProcessedRef.current && 
+        lastProcessedRef.current.barcode === barcode && 
+        (now - lastProcessedRef.current.time) < 2500) {
+      return; 
+    }
+
+    // 2. Check if we are currently mid-process of any scan
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    setLastScanned(barcode);
+    setIsLoading(true);
+    setError(null);
+
+    // Update the ref immediately
+    lastProcessedRef.current = { barcode, time: now };
+
+    try {
+      const product = await fetchProduct(barcode);
+      addToCart(product);
+      
+      // Provide a brief "Success" visual state
+      setTimeout(() => {
+        setIsProcessing(false);
+        setLastScanned(null);
+        setIsLoading(false);
+      }, 1500); // Cooldown period where scanner is "locked"
+
+    } catch (err) {
+      setError("Produk tidak ditemukan.");
+      setIsProcessing(false);
+      setIsLoading(false);
+      // Allow re-scanning after error
+      lastProcessedRef.current = null;
+    }
+  };
+
+  const addToCart = (product: Product) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.barcode === product.barcode);
+      if (existing) {
+        return prev.map(item => 
+          item.barcode === product.barcode 
+            ? { ...item, quantity: item.quantity + 1 } 
+            : item
+        );
+      }
+      return [...prev, { ...product, quantity: 1 }];
+    });
+  };
+
+  const updateQuantity = (barcode: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.barcode === barcode) {
+        const nextQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: nextQty };
+      }
+      return item;
+    }));
+  };
+
+  const removeFromCart = (barcode: string) => {
+    setCart(prev => prev.filter(item => item.barcode !== barcode));
+  };
+
+  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="min-h-screen p-4 md:p-8 flex items-center justify-center">
+      <div className="w-full h-full max-w-6xl flex flex-col lg:flex-row gap-6">
+        
+        {/* Left Side: Header & Scanner */}
+        <div className="flex-1 flex flex-col gap-6 no-print">
+          {/* Glass Header */}
+          <header className="glass rounded-3xl p-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                <ScanLine size={24} />
+              </div>
+              <h1 className="text-xl font-bold tracking-tight">KASIR SMART v2.0</h1>
+            </div>
+            <div className="text-sm text-slate-400 hidden sm:block">
+              {new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+          </header>
+
+          {/* Scanner Container */}
+          <div className="glass flex-1 rounded-3xl overflow-hidden relative border-blue-500/30 flex flex-col min-h-[500px]">
+            <div className="absolute inset-0 bg-black/40 z-0"></div>
+            <div className="absolute top-0 left-0 w-full scanner-line z-10"></div>
+            
+            {/* Success Overlay */}
+            <AnimatePresence>
+              {isProcessing && !isLoading && !error && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-green-500/20 z-20 flex items-center justify-center backdrop-blur-[2px]"
+                >
+                  <motion.div 
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    className="bg-green-500 text-white p-4 rounded-full shadow-2xl shadow-green-500/50"
+                  >
+                    <Plus size={48} strokeWidth={3} />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            <div className="relative z-10 flex-1 flex flex-col p-6">
+              <BarcodeScanner onScan={handleScan} />
+
+              <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-end">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-widest text-blue-400 font-bold">Status Sistem</p>
+                  <h2 className="text-lg font-medium">
+                    {isLoading ? "Mencari Produk..." : error ? "Error Terdeteksi" : lastScanned ? `Terdeteksi: ${lastScanned}` : "Siap Memindai..."}
+                  </h2>
+                </div>
+                {error && (
+                  <button 
+                    onClick={() => setError(null)}
+                    className="px-4 py-1.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-medium text-red-400 hover:bg-red-500/30 transition-colors"
+                  >
+                    Reset Error
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Cart & Checkout */}
+        <div className="w-full lg:w-[450px] flex flex-col gap-6 print:w-full print:gap-0">
+          <div className="glass flex-1 rounded-3xl p-6 flex flex-col print:bg-transparent print:border-none print:p-0">
+            <div className="flex justify-between items-center mb-6 no-print">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <ShoppingCart size={20} className="text-blue-400" /> 
+                Keranjang Belanja
+                <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full ml-1 font-normal opacity-70">
+                  {cart.length}
+                </span>
+              </h3>
+              {cart.length > 0 && (
+                <button 
+                  onClick={() => setCart([])}
+                  className="text-xs text-slate-400 hover:text-red-400 transition-colors font-medium underline underline-offset-4"
+                >
+                  Kosongkan
+                </button>
+              )}
+            </div>
+
+            <div className="hidden print:block text-center mb-8 text-black">
+              <h1 className="text-3xl font-black uppercase italic">TRX RECEIPT</h1>
+              <p className="text-sm opacity-60">ScanKasir System - {new Date().toLocaleString()}</p>
+              <div className="border-b-2 border-dashed border-black my-4 opacity-20" />
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto max-h-[50vh] lg:max-h-none pr-2 custom-scrollbar print:overflow-visible print:max-h-none print:pr-0">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {cart.map((item) => (
+                  <motion.div
+                    key={item.barcode}
+                    layout
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all group print:bg-transparent print:border-b print:border-black/10 print:rounded-none print:p-2 print:text-black"
+                  >
+                    <img 
+                      src={item.imageUrl} 
+                      className="w-16 h-16 object-cover rounded-xl shadow-lg shadow-black/20 print:hidden" 
+                      alt={item.name} 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate text-sm">{item.name}</h4>
+                      <p className="text-blue-400 font-bold text-xs mt-0.5 print:text-black">
+                        Rp {item.price.toLocaleString("id-ID")}
+                      </p>
+                      
+                      <div className="flex items-center gap-3 mt-3 no-print">
+                        <div className="flex items-center bg-black/40 rounded-lg overflow-hidden border border-white/10">
+                          <button 
+                            onClick={() => updateQuantity(item.barcode, -1)}
+                            disabled={item.quantity <= 1}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 disabled:opacity-20 transition-colors"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="w-8 text-center text-xs font-bold">{item.quantity}</span>
+                          <button 
+                            onClick={() => updateQuantity(item.barcode, 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-white/10 transition-colors"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                        <button 
+                          onClick={() => removeFromCart(item.barcode)}
+                          className="text-red-400/60 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="hidden print:block text-right">
+                      <p className="text-xs">x{item.quantity}</p>
+                      <p className="font-bold text-sm">Rp {(item.price * item.quantity).toLocaleString("id-ID")}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {cart.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-500 no-print">
+                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                    <ShoppingCart size={32} strokeWidth={1.5} />
+                  </div>
+                  <p className="text-sm">Keranjang anda kosong.<br/>Silahkan scan produk.</p>
+                </div>
+              )}
+            </div>
+
+            {cart.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-white/10 space-y-5 print:border-none print:mt-4 print:p-0 print:text-black">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 print:text-black print:opacity-60 text-sm font-medium">Total Pembayaran</span>
+                  <span className="text-2xl font-bold text-blue-400 print:text-black">
+                    Rp {total.toLocaleString("id-ID")}
+                  </span>
+                </div>
+                
+                <button 
+                  onClick={handlePrint}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/40 transition-all flex items-center justify-center gap-3 no-print active:scale-[0.98]"
+                >
+                  <Printer size={22} /> PRINT NOTA
+                </button>
+
+                <div className="hidden print:block text-center mt-12 text-black">
+                  <div className="border-b-2 border-dashed border-black my-4 opacity-20" />
+                  <p className="text-lg font-bold">TERIMA KASIH</p>
+                  <p className="text-xs opacity-60 italic">ScanKasir - Point of Sale System</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

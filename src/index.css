@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0f172a] text-white min-h-screen antialiased;
+    background: radial-gradient(circle at top left, #1e293b, #0f172a),
+                radial-gradient(circle at bottom right, #334155, #0f172a);
+    background-attachment: fixed;
+  }
+}
+
+.glass {
+  @apply bg-white/5 border border-white/10;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.scanner-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+  animation: scan 3s ease-in-out infinite;
+}
+
+@keyframes scan {
+  0%, 100% { top: 10%; }
+  50% { top: 90%; }
+}
+
+@layer utilities {
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    
+    body {
+      background: white !important;
+      color: black !important;
+      padding: 0 !important;
+    }
+
+    * {
+      color: black !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      border-color: #eee !important;
+    }
+  }
+}
+
+/* html5-qrcode scanner UI cleanup */
+#reader {
+  border: none !important;
+  background: transparent !important;
+}
+
+#reader__dashboard_section_csr button {
+  @apply bg-blue-600 text-white rounded-lg px-4 py-2 border-none cursor-pointer font-semibold m-1 hover:bg-blue-700 transition-colors;
+}
+
+#reader__scan_region {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+#reader__status_span {
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+select {
+  padding-top: 0.6rem !important;
+  padding-bottom: 0.6rem !important;
+  padding-left: 0.75rem !important;
+  padding-right: 2.5rem !important; /* Ruang lebih luas untuk arrow */
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(15, 23, 42, 0.8) !important; /* bg-slate-900 with opacity */
+  color: white !important;
+  outline: none !important;
+  cursor: pointer !important;
+  appearance: none !important; /* Sembunyikan arrow bawaan */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 1.25rem !important;
+  transition: all 0.2s ease !important;
+}
+
+select:hover {
+  background-color: rgba(30, 41, 59, 0.9) !important;
+  border-color: rgba(59, 130, 246, 0.5) !important; /* blue-500 border on hover */
+}
+
+.camera-select-container {
+  @apply flex flex-col gap-3 p-4 bg-black/40 rounded-2xl border border-white/10 mb-4;
+}
+
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-6 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2;
+}

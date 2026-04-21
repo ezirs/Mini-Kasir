@@ -1,0 +1,6 @@
+{
+  "name": "ScanKasir",
+  "description": "Aplikasi kasir pintar dengan fitur pemindaian barcode, manajemen keranjang, dan cetak nota.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}
