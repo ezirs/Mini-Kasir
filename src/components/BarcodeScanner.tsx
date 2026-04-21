@@ -44,7 +44,7 @@ export default function BarcodeScanner({ onScan, onStatusChange }: BarcodeScanne
       }
     } catch (err: any) {
       if (err?.name === "NotAllowedError" || String(err).includes("denied")) {
-        setError("Izin kamera ditolak. Klik ikon gembok di alamat bar browser anda, lalu izinkan kamera dan refresh halaman.");
+        setError("Izin kamera ditolak. Jika anda menggunakan aplikasi ini di dalam 'embed/iframe', pastikan aplikasi induk anda memberikan akses kamera (atribut allow='camera').");
       } else {
         setError("Gagal mengakses kamera. Pastikan browser anda mengizinkan akses kamera.");
       }
@@ -83,7 +83,7 @@ export default function BarcodeScanner({ onScan, onStatusChange }: BarcodeScanne
       setError(null);
     } catch (err: any) {
       if (err?.name === "NotAllowedError" || String(err).includes("denied")) {
-        setError("Izin akses kamera diblokir. Harap izinkan melalui pengaturan browser.");
+        setError("Izin akses kamera diblokir. Harap izinkan melalui pengaturan browser atau pastikan atribut allow='camera' ada di tag iframe anda.");
       } else if (String(err).toLowerCase().includes("could not start video source") || String(err).toLowerCase().includes("readableerror")) {
         setError("Kamera sedang digunakan oleh aplikasi lain (seperti Zoom, WhatsApp, atau tab browser lain). Tutup aplikasi tersebut dan coba lagi.");
       } else {

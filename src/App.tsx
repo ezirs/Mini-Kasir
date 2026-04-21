@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import BarcodeScanner from "./components/BarcodeScanner";
 import { Product, CartItem } from "./types";
-import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2, Download } from "lucide-react";
+import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2, Download, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 const GAS_URL = import.meta.env.VITE_GAS_API_URL;
@@ -16,6 +16,7 @@ export default function App() {
   const [isIframe, setIsIframe] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastHardwareScan, setLastHardwareScan] = useState<number | null>(null);
   
   // Ref for hardware scanner buffer
   const scannerBufferRef = useRef<string>("");
@@ -34,28 +35,24 @@ export default function App() {
 
     // Hardware Scanner Listener (Keyboard Emulator)
     const hardwareScannerHandler = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input or textarea
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-        return;
-      }
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
       const now = Date.now();
-      
-      // If delay between keys is too long, it's probably manual typing, so reset
       if (now - lastKeyTimeRef.current > 100) {
         scannerBufferRef.current = "";
       }
-      
       lastKeyTimeRef.current = now;
 
       if (e.key === "Enter") {
         if (scannerBufferRef.current.length > 3) {
           handleScan(scannerBufferRef.current);
+          setLastHardwareScan(Date.now());
+          // Clear pulse after 2 seconds
+          setTimeout(() => setLastHardwareScan(null), 2000);
         }
         scannerBufferRef.current = "";
       } else if (e.key.length === 1) {
-        // Collect characters
         scannerBufferRef.current += e.key;
       }
     };
@@ -308,18 +305,36 @@ export default function App() {
               <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-end">
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-widest text-blue-400 font-bold">Status Sistem</p>
-                  <h2 className="text-lg font-medium leading-tight">
-                    {!isScannerActive ? "Kamera Nonaktif" : 
-                     isLoading ? "Mencari Produk..." : 
-                     error ? (
-                       <span className="text-red-400 text-sm block">
-                         {error} <br/> 
-                         <span className="text-[10px] text-white/40 block mt-1">Barcode: {lastScanned}</span>
-                       </span>
-                     ) : 
-                     lastScanned ? `Terdeteksi: ${lastScanned}` : 
-                     "Siap Memindai..."}
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-medium leading-tight">
+                      {!isScannerActive ? "Kamera Nonaktif" : 
+                       isLoading ? "Mencari Produk..." : 
+                       error ? (
+                         <span className="text-red-400 text-sm block">
+                           {error} <br/> 
+                           <span className="text-[10px] text-white/40 block mt-1">Barcode: {lastScanned}</span>
+                         </span>
+                       ) : 
+                       lastScanned ? `Terdeteksi: ${lastScanned}` : 
+                       "Siap Memindai..."}
+                    </h2>
+                    
+                    {/* Hardware Scanner Badge */}
+                    <div className="group relative">
+                      <motion.div 
+                        animate={lastHardwareScan ? { scale: [1, 1.15, 1], backgroundColor: ["rgba(59, 130, 246, 0.1)", "rgba(59, 130, 246, 0.5)", "rgba(59, 130, 246, 0.1)"] } : {}}
+                        className="px-2 py-1 rounded-md border border-blue-500/20 bg-blue-500/10 flex items-center gap-1.5 cursor-help"
+                      >
+                        <Zap size={10} className={lastHardwareScan ? "text-blue-300 animate-pulse" : "text-blue-500/40"} />
+                        <span className="text-[9px] font-bold text-blue-400/80 uppercase">Hardware Ready</span>
+                      </motion.div>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/10 rounded-lg text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl z-50">
+                        Alat scanner laser (USB/Bluetooth) terdeteksi otomatis. Silakan tembak barcode langsung tanpa klik apapun. Label ini akan berkedip saat data diterima.
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 {error && (
                   <button 
