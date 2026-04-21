@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import BarcodeScanner from "./components/BarcodeScanner";
 import { Product, CartItem } from "./types";
-import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2 } from "lucide-react";
+import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2, Download } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 const GAS_URL = import.meta.env.VITE_GAS_API_URL;
@@ -12,8 +12,32 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScannerActive, setIsScannerActive] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isIframe, setIsIframe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Check if running in iframe and listen for PWA install prompt
+  useEffect(() => {
+    setIsIframe(window.self !== window.top);
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   // ... rest of state ...
   const lastProcessedRef = useRef<{ barcode: string; time: number } | null>(null);
 
@@ -199,6 +223,14 @@ export default function App() {
                   <Plus size={16} />
                 </button>
               </form>
+              {!isIframe && deferredPrompt && (
+                <button 
+                  onClick={handleInstallClick}
+                  className="bg-blue-500 hover:bg-blue-400 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                >
+                  <Download size={14} /> INSTALL WEBAPP
+                </button>
+              )}
               <div className="text-sm text-slate-400 hidden sm:block">
                 {new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
