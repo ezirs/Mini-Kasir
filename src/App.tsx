@@ -394,7 +394,7 @@ export default function App() {
 
             <div className="hidden print:block text-center mb-8 text-black">
               <h1 className="text-3xl font-black uppercase italic">TRX RECEIPT</h1>
-              <p className="text-sm opacity-60">ScanKasir System - {new Date().toLocaleString()}</p>
+              <p className="text-sm opacity-60">Mini Kasir - {new Date().toLocaleString()}</p>
               <div className="border-b-2 border-dashed border-black my-4 opacity-20" />
             </div>
 
@@ -484,7 +484,7 @@ export default function App() {
                 <div className="hidden print:block text-center mt-12 text-black">
                   <div className="border-b-2 border-dashed border-black my-4 opacity-20" />
                   <p className="text-lg font-bold">TERIMA KASIH</p>
-                  <p className="text-xs opacity-60 italic">ScanKasir - Point of Sale System</p>
+                  <p className="text-xs opacity-60 italic">Mini Kasir - Point of Sale System</p>
                 </div>
               </div>
             )}
