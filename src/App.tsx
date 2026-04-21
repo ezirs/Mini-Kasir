@@ -17,6 +17,7 @@ export default function App() {
   const [isStandalone, setIsStandalone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastHardwareScan, setLastHardwareScan] = useState<number | null>(null);
+  const [showHardwareInfo, setShowHardwareInfo] = useState(false);
   
   // Ref for hardware scanner buffer
   const scannerBufferRef = useRef<string>("");
@@ -322,16 +323,37 @@ export default function App() {
                     {/* Hardware Scanner Badge */}
                     <div className="group relative">
                       <motion.div 
+                        onClick={() => setShowHardwareInfo(!showHardwareInfo)}
                         animate={lastHardwareScan ? { scale: [1, 1.15, 1], backgroundColor: ["rgba(59, 130, 246, 0.1)", "rgba(59, 130, 246, 0.5)", "rgba(59, 130, 246, 0.1)"] } : {}}
-                        className="px-2 py-1 rounded-md border border-blue-500/20 bg-blue-500/10 flex items-center gap-1.5 cursor-help"
+                        className="px-2 py-1 rounded-md border border-blue-500/20 bg-blue-500/10 flex items-center gap-1.5 cursor-pointer md:cursor-help"
                       >
                         <Zap size={10} className={lastHardwareScan ? "text-blue-300 animate-pulse" : "text-blue-500/40"} />
                         <span className="text-[9px] font-bold text-blue-400/80 uppercase">Hardware Ready</span>
                       </motion.div>
                       
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 border border-white/10 rounded-lg text-[9px] text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl z-50">
-                        Alat scanner laser (USB/Bluetooth) terdeteksi otomatis. Silakan tembak barcode langsung tanpa klik apapun. Label ini akan berkedip saat data diterima.
+                      {/* Tooltip - show on hover (desktop) or showHardwareInfo (mobile/tap) */}
+                      <AnimatePresence>
+                        {(showHardwareInfo) && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: -8, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-0 mb-1 w-56 p-3 bg-slate-900 border border-blue-500/30 rounded-xl text-[10px] text-slate-300 shadow-2xl z-50 ring-1 ring-white/10"
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="text-blue-400 font-bold uppercase">Info Scanner Fisik</span>
+                              <button onClick={(e) => { e.stopPropagation(); setShowHardwareInfo(false); }} className="text-white/40 hover:text-white">
+                                <Plus size={10} className="rotate-45" />
+                              </button>
+                            </div>
+                            Alat scanner laser (USB/Bluetooth) terdeteksi otomatis. Silakan tembak barcode langsung tanpa klik apapun. Label ini akan berkedip saat data diterima.
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      
+                      {/* Desktop only hover info (hidden on mobile via group-hover exclusion or just logic) */}
+                      <div className="hidden md:group-hover:block absolute bottom-full left-0 mb-1 w-56 p-3 bg-slate-900 border border-blue-500/30 rounded-xl text-[10px] text-slate-300 shadow-2xl z-40 pointer-events-none">
+                        Klik untuk tetap menampilkan info.
                       </div>
                     </div>
                   </div>
