@@ -4,6 +4,7 @@ import { Camera, RefreshCcw, Play, Square } from "lucide-react";
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
+  onStatusChange?: (isScanning: boolean) => void;
 }
 
 interface CameraDevice {
@@ -11,14 +12,21 @@ interface CameraDevice {
   label: string;
 }
 
-export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
+export default function BarcodeScanner({ onScan, onStatusChange }: BarcodeScannerProps) {
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
+  const updateScanningStatus = (status: boolean) => {
+    setIsScanning(status);
+    onStatusChange?.(status);
+  };
+
   const getCameras = useCallback(async () => {
+    if (isScanning) return; // Prevent refreshing while camera is busy
+    setError(null);
     try {
       const devices = await Html5Qrcode.getCameras();
       if (devices && devices.length > 0) {
@@ -51,9 +59,10 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
     return () => {
       if (html5QrCodeRef.current?.isScanning) {
         html5QrCodeRef.current.stop().catch(e => console.error(e));
+        onStatusChange?.(false);
       }
     };
-  }, [getCameras]);
+  }, [getCameras, onStatusChange]);
 
   const startScanning = async () => {
     if (!html5QrCodeRef.current || !selectedCameraId) return;
@@ -70,11 +79,13 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
         },
         undefined // ignore individual scan errors
       );
-      setIsScanning(true);
+      updateScanningStatus(true);
       setError(null);
     } catch (err: any) {
       if (err?.name === "NotAllowedError" || String(err).includes("denied")) {
         setError("Izin akses kamera diblokir. Harap izinkan melalui pengaturan browser.");
+      } else if (String(err).toLowerCase().includes("could not start video source") || String(err).toLowerCase().includes("readableerror")) {
+        setError("Kamera sedang digunakan oleh aplikasi lain (seperti Zoom, WhatsApp, atau tab browser lain). Tutup aplikasi tersebut dan coba lagi.");
       } else {
         setError("Gagal menyalakan kamera. Silakan pilih kamera lain atau refresh halaman.");
       }
@@ -86,7 +97,7 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
     if (html5QrCodeRef.current) {
       try {
         await html5QrCodeRef.current.stop();
-        setIsScanning(false);
+        updateScanningStatus(false);
       } catch (err) {
         console.error("Gagal mematikan kamera:", err);
       }
@@ -126,10 +137,15 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
           {cameras.length > 0 && (
             <button 
               onClick={getCameras}
-              className="p-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-              title="Refresh list kamera"
+              disabled={isScanning}
+              className={`p-2 rounded-lg border transition-all ${
+                isScanning 
+                  ? "bg-white/5 border-white/5 opacity-20 cursor-not-allowed" 
+                  : "bg-white/5 border-white/10 hover:bg-white/10 active:scale-95"
+              }`}
+              title={isScanning ? "Matikan kamera sebelum refresh" : "Refresh list kamera"}
             >
-              <RefreshCcw size={16} />
+              <RefreshCcw size={16} className={isScanning ? "" : "text-blue-400"} />
             </button>
           )}
         </div>
@@ -157,11 +173,6 @@ export default function BarcodeScanner({ onScan }: BarcodeScannerProps) {
           <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
             <p className="text-[10px] text-red-400 font-medium leading-relaxed">
               {error}
-              {error.includes("ditolak") && (
-                <span className="block mt-1 text-white/60 font-normal">
-                  Jika tetap gagal, coba buka aplikasi di <strong>Tab Baru</strong> melalui menu di pojok kanan atas.
-                </span>
-              )}
             </p>
           </div>
         )}

@@ -1,6 +1,8 @@
 {
-  "name": "ScanKasir",
-  "description": "Aplikasi kasir pintar dengan fitur pemindaian barcode, manajemen keranjang, dan cetak nota.",
-  "requestFramePermissions": ["camera"],
+  "name": "Mini-Kasir",
+  "description": "Aplikasi kasir ringan yang dibangun menggunakan React (Vite) dan TypeScript. Sistem ini melakukan pemindaian barcode produk melalui kamera, kemudian mencocokkan datanya secara real-time ke Google Sheets melalui Google Apps Script (GAS) sebagai bridge API.",
+  "requestFramePermissions": [
+    "camera"
+  ],
   "majorCapabilities": []
 }

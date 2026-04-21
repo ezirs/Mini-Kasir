@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import BarcodeScanner from "./components/BarcodeScanner";
 import { Product, CartItem } from "./types";
 import { Plus, Minus, Trash2, Printer, ScanLine, ShoppingCart, Loader2 } from "lucide-react";
@@ -11,10 +11,21 @@ export default function App() {
   const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isScannerActive, setIsScannerActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Use Ref for instant tracking to prevent race conditions during state updates
+  // ... rest of state ...
   const lastProcessedRef = useRef<{ barcode: string; time: number } | null>(null);
+
+  // Auto-clear error after 3 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   const fetchProduct = useCallback(async (barcode: string) => {
     // ... existing mock logic ...
@@ -43,40 +54,44 @@ export default function App() {
   const handleScan = async (barcode: string) => {
     const now = Date.now();
     
-    // 1. Check if same barcode was processed very recently (within 2.5 seconds)
+    // 1. Prevent double processing of same barcode
     if (lastProcessedRef.current && 
         lastProcessedRef.current.barcode === barcode && 
         (now - lastProcessedRef.current.time) < 2500) {
       return; 
     }
 
-    // 2. Check if we are currently mid-process of any scan
+    // 2. Prevent overlapping scans
     if (isProcessing) return;
 
+    // Reset states immediately for new scan
+    setError(null);
     setIsProcessing(true);
     setLastScanned(barcode);
     setIsLoading(true);
-    setError(null);
 
-    // Update the ref immediately
+    // Update the ref to track this new attempt
     lastProcessedRef.current = { barcode, time: now };
 
     try {
       const product = await fetchProduct(barcode);
       addToCart(product);
       
-      // Provide a brief "Success" visual state
+      // Success: Clear loading immediately so status shows product name
+      setIsLoading(false);
+      
+      // Cooldown to prevent laser re-triggering too fast
       setTimeout(() => {
         setIsProcessing(false);
-        setLastScanned(null);
-        setIsLoading(false);
-      }, 1500); // Cooldown period where scanner is "locked"
+        // We keep lastScanned for a bit so user sees what was added
+        setTimeout(() => setLastScanned(null), 1000);
+      }, 800); 
 
-    } catch (err) {
-      setError("Produk tidak ditemukan.");
-      setIsProcessing(false);
+    } catch (err: any) {
+      setError(err?.message || "Produk tidak ditemukan.");
       setIsLoading(false);
-      // Allow re-scanning after error
+      setIsProcessing(false);
+      // Allow immediate re-scan on error
       lastProcessedRef.current = null;
     }
   };
@@ -115,8 +130,51 @@ export default function App() {
     window.print();
   };
 
+  const handleManualInput = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const barcode = formData.get("barcode") as string;
+    if (barcode) {
+      handleScan(barcode);
+      e.currentTarget.reset();
+    }
+  };
+
   return (
     <div className="min-h-screen p-4 md:p-8 flex items-center justify-center">
+      {/* Floating Error Toast */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 20, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-sm"
+          >
+            <div className="bg-red-500 border border-red-400/50 text-white p-4 rounded-2xl shadow-2xl shadow-red-900/40 flex items-center gap-4">
+              <div className="bg-white/20 p-2.5 rounded-full shrink-0">
+                <ScanLine size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black uppercase tracking-wider">Gagal Menemukan Barang</p>
+                <p className="text-xs opacity-90 mt-0.5 font-medium">{error}</p>
+                <div className="mt-2 py-1.5 px-2 bg-black/20 rounded-lg border border-white/5">
+                  <p className="text-[10px] text-white/60">
+                    <span className="text-blue-300 font-bold">Tips:</span> Pastikan barcode <span className="font-mono text-white">{lastScanned}</span> sudah ada di kolom A Google Sheets anda.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setError(null)}
+                className="hover:bg-white/10 p-2 rounded-xl transition-colors shrink-0"
+              >
+                <Minus size={20} className="rotate-45" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="w-full h-full max-w-6xl flex flex-col lg:flex-row gap-6">
         
         {/* Left Side: Header & Scanner */}
@@ -127,17 +185,30 @@ export default function App() {
               <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                 <ScanLine size={24} />
               </div>
-              <h1 className="text-xl font-bold tracking-tight">KASIR SMART v2.0</h1>
+              <h1 className="text-xl font-bold tracking-tight">Mini Kasir</h1>
             </div>
-            <div className="text-sm text-slate-400 hidden sm:block">
-              {new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            <div className="flex items-center gap-4">
+              <form onSubmit={handleManualInput} className="hidden md:flex items-center bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-blue-500/50 transition-colors">
+                <input 
+                  name="barcode"
+                  type="text" 
+                  placeholder="Input Barcode Manual..." 
+                  className="bg-transparent border-none outline-none text-xs w-32 md:w-48 placeholder:text-white/20"
+                />
+                <button type="submit" className="text-blue-400 hover:text-blue-300">
+                  <Plus size={16} />
+                </button>
+              </form>
+              <div className="text-sm text-slate-400 hidden sm:block">
+                {new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </div>
             </div>
           </header>
 
           {/* Scanner Container */}
           <div className="glass flex-1 rounded-3xl overflow-hidden relative border-blue-500/30 flex flex-col min-h-[500px]">
             <div className="absolute inset-0 bg-black/40 z-0"></div>
-            <div className="absolute top-0 left-0 w-full scanner-line z-10"></div>
+            {isScannerActive && <div className="absolute top-0 left-0 w-full scanner-line z-10"></div>}
             
             {/* Success Overlay */}
             <AnimatePresence>
@@ -160,13 +231,22 @@ export default function App() {
             </AnimatePresence>
             
             <div className="relative z-10 flex-1 flex flex-col p-6">
-              <BarcodeScanner onScan={handleScan} />
+              <BarcodeScanner onScan={handleScan} onStatusChange={setIsScannerActive} />
 
               <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-end">
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-widest text-blue-400 font-bold">Status Sistem</p>
-                  <h2 className="text-lg font-medium">
-                    {isLoading ? "Mencari Produk..." : error ? "Error Terdeteksi" : lastScanned ? `Terdeteksi: ${lastScanned}` : "Siap Memindai..."}
+                  <h2 className="text-lg font-medium leading-tight">
+                    {!isScannerActive ? "Kamera Nonaktif" : 
+                     isLoading ? "Mencari Produk..." : 
+                     error ? (
+                       <span className="text-red-400 text-sm block">
+                         {error} <br/> 
+                         <span className="text-[10px] text-white/40 block mt-1">Barcode: {lastScanned}</span>
+                       </span>
+                     ) : 
+                     lastScanned ? `Terdeteksi: ${lastScanned}` : 
+                     "Siap Memindai..."}
                   </h2>
                 </div>
                 {error && (
