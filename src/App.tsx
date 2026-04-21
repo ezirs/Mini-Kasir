@@ -14,19 +14,59 @@ export default function App() {
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIframe, setIsIframe] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Check if running in iframe and listen for PWA install prompt
+  // Ref for hardware scanner buffer
+  const scannerBufferRef = useRef<string>("");
+  const lastKeyTimeRef = useRef<number>(0);
+
+  // Check environment and setup global listeners
   useEffect(() => {
     setIsIframe(window.self !== window.top);
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
 
-    const handler = (e: any) => {
+    // PWA Install Prompt
+    const installHandler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
 
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    // Hardware Scanner Listener (Keyboard Emulator)
+    const hardwareScannerHandler = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return;
+      }
+
+      const now = Date.now();
+      
+      // If delay between keys is too long, it's probably manual typing, so reset
+      if (now - lastKeyTimeRef.current > 100) {
+        scannerBufferRef.current = "";
+      }
+      
+      lastKeyTimeRef.current = now;
+
+      if (e.key === "Enter") {
+        if (scannerBufferRef.current.length > 3) {
+          handleScan(scannerBufferRef.current);
+        }
+        scannerBufferRef.current = "";
+      } else if (e.key.length === 1) {
+        // Collect characters
+        scannerBufferRef.current += e.key;
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', installHandler);
+    window.addEventListener('keydown', hardwareScannerHandler);
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', installHandler);
+      window.removeEventListener('keydown', hardwareScannerHandler);
+    };
   }, []);
 
   const handleInstallClick = async () => {
@@ -223,7 +263,7 @@ export default function App() {
                   <Plus size={16} />
                 </button>
               </form>
-              {!isIframe && deferredPrompt && (
+              {!isIframe && !isStandalone && deferredPrompt && (
                 <button 
                   onClick={handleInstallClick}
                   className="bg-blue-500 hover:bg-blue-400 text-white text-[10px] font-bold px-3 py-1.5 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
